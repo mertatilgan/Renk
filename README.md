@@ -29,7 +29,7 @@ Renk is a Minecraft plugin that allows players to change their display name colo
 3. Submit a pull request with a detailed explanation of your changes.
 
 ## License
-This project is licensed under the MIT License.
+This project is licensed under the GPL-3.0 License.
 
 ## Support
 If you encounter any issues or need further assistance, feel free to open an issue on the GitHub repository.
