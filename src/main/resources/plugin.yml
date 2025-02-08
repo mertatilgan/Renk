@@ -1,13 +1,22 @@
 name: Renk
-version: '1.0'
+version: '1.1'
 main: me.kikaru.renk.Renk
 api-version: '1.21.4'
+description: Allows players to set their color.
+authors: [Kikaru]
 commands:
   renk:
-    description: Change your display name color.
-    usage: /renk #HEX
+    description: Sets your chat color.
+    usage: /<command> <color> | /<command> reset | /<command> set <player> <color> | /<command> reset <player>
+    aliases: [color]
     permission: renk.use
 permissions:
   renk.use:
-    description: Allows the player to change their display name color.
+    description: Allows a player to use the /renk command to change their own color.
     default: true
+  renk.set.other:
+    description: Allows a player to set another player's color.
+    default: op
+  renk.reset.other:
+    description: Allows a player to reset another player's color.
+    default: op

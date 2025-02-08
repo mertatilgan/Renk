@@ -1,0 +1,12 @@
+messages:
+  invalid_color: "<color:red>Invalid color!</color> Use a <color:yellow>hex code</color> or one of: <color:yellow>black, dark_blue, dark_green, etc.</color>"
+  usage: "Usage:\n /renk <color:yellow>#HEX</color>\n /renk reset\n /renk set <color:green><player></color> <color:yellow>#HEX</color>\n /renk reset <color:green><player></color>"
+  player_only: "<color:red>Only players can use this command!</color>"
+  no_permission: "<color:red>You don't have permission to use this command!</color>"
+  player_not_found: "<color:red>Player not found!</color>"
+  color_changed: "Your color has been changed to <color:%output_color%>%input_color%</color>!"
+  admin_color_set: "%player%'s color has been changed to <color:%output_color%>%input_color%</color>!"
+  admin_color_notify: "Your color has been changed by an admin to <color:%output_color%>%input_color%</color>!"
+  color_reset: "Your color has been reset to default."
+  admin_color_reset: "Reset %player%'s color to default."
+  admin_color_reset_notify: "Your color has been reset to default by an admin."
