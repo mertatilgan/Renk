@@ -1,0 +1,13 @@
+name: Renk
+version: '1.0'
+main: me.kikaru.renk.Renk
+api-version: '1.21.4'
+commands:
+  renk:
+    description: Change your display name color.
+    usage: /renk #HEX
+    permission: renk.use
+permissions:
+  renk.use:
+    description: Allows the player to change their display name color.
+    default: true
