@@ -20,7 +20,7 @@ Renk is a Minecraft plugin that allows players to change their display name colo
 - `renk.set`: Allows the change of color for other players.
 
 ## Setup and Installation
-1. Download and place the `Renk` plugin `.jar` file into the `plugins` folder of your Paper/Spigot server.
+1. Download and place the `Renk` plugin `.jar` file into the `plugins` folder of your Paper server.
 2. The plugin will automatically create an SQLite database (`user_colors.db`) in the `plugins/Renk/` folder to store player colors.
 
 ## How to Contribute
