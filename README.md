@@ -1,27 +1,26 @@
 # Renk - Minecraft Color Plugin
-Renk is a Minecraft plugin that allows players to change their display name color in the game. Players can choose from a variety of predefined colors or specify their own hex color codes. Admins can also set the colors of other players.
+Renk is a Minecraft plugin that allows players to change their name color.
 
 ## Features
-- Players can change their display name color using a command.
+- Players can change or reset their color using a command.
 - Admins can set the color of other players.
-- Player colors are saved to an SQLite database and applied when they join.
+- Player colors are saved to an JSON file and applied when they join.
 - Predefined color options are available (e.g., black, blue, green, etc.).
 - The plugin utilizes the [MiniMessage](https://docs.advntr.dev/) library to format color codes and messages.
 
 ## Planned Features
-- Configurable messages through a `config.yml` file for customizing plugin messages (e.g., error and success messages) and the ability to set predefined color names with their associated hex values.
+- Color approximated team generation to modify name tag colors.
 
 ## Commands
 - `/renk <#hex>`: Changes the player's color to the specified hex color or predefined color.
 - `/renk set <player> <#hex>`: Allows admins to set the color of another player.
+- `/renk reset>`: Allows users to reset their own color.
+- `/renk reset <player>`: Allows admins to reset the colour of another player.
 
 ### Permissions
 - `renk.use`: Allows the use of the plugin itself.
-- `renk.set`: Allows the change of color for other players.
-
-## Setup and Installation
-1. Download and place the `Renk` plugin `.jar` file into the `plugins` folder of your Paper server.
-2. The plugin will automatically create an SQLite database (`user_colors.db`) in the `plugins/Renk/` folder to store player colors.
+- `renk.set.other`: Allows the change of color for other players.
+- `renk.reset.other`: Allows reseting another player's color.
 
 ## How to Contribute
 1. Fork the repository.
