@@ -1,5 +1,5 @@
 name: Renk
-version: '1.1'
+version: '1.2'
 main: me.kikaru.renk.Renk
 api-version: '1.21.4'
 description: Allows players to set their color.

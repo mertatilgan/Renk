@@ -4,17 +4,17 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
-import org.bukkit.command.TabExecutor;
+import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -22,73 +22,101 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Renk plugin: Allows players to customize their display name color.
+ */
 public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter {
 
+    //region Constants
     private static final String DATA_FILE_PATH = "plugins/Renk/player_colors.json";
-    // Gson for handling JSON serialization and deserialization.  `setPrettyPrinting` makes the JSON file more human-readable.
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    private final Map<UUID, String> playerColors = new HashMap<>();
+    private static final String DEFAULT_HEX_COLOR = "#FFFFFF";
+    //endregion
 
+    //region Fields
+    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private final Map<UUID, PlayerColorData> playerColors = new HashMap<>();
+    private Scoreboard scoreboard;
+    //endregion
+
+    //region Plugin Lifecycle
     @Override
     public void onEnable() {
         saveDefaultConfig();
         reloadConfig();
 
-        Objects.requireNonNull(this.getCommand("renk")).setExecutor(this);
-        Objects.requireNonNull(this.getCommand("renk")).setTabCompleter(this);
+        // Register command and tab completer
+        PluginCommand renkCommand = getCommand("renk");
+        if (renkCommand != null) {
+            renkCommand.setExecutor(this);
+            renkCommand.setTabCompleter(this);
+        } else {
+            getLogger().severe("Could not register the 'renk' command.");
+        }
 
+        scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
         loadData();
 
-        Bukkit.getServer().getPluginManager().registerEvents(new Listener() {
-            @EventHandler
-            public void onPlayerJoin(PlayerJoinEvent event) {
-                Player player = event.getPlayer();
-                String colorHex = playerColors.get(player.getUniqueId()); // Directly access the map
-
-                if (colorHex != null) {
-                    setPlayerColor(player, colorHex);
-                }
-            }
-        }, this);
+        // Register event listener for player join
+        getServer().getPluginManager().registerEvents(new PlayerJoinListener(), this);
     }
 
     @Override
     public void onDisable() {
         saveData();
     }
+    //endregion
 
+    //region Command Handling
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String @NotNull [] args) {
+        // Using a MiniMessage instance for text formatting
         MiniMessage miniMessage = MiniMessage.miniMessage();
 
-        // Handles different command arguments using if/else if statements
-        // "renk reset" - Resets the color of the command sender
-        if (args.length == 1 && args[0].equalsIgnoreCase("reset")) {
-            return handleSelfColorReset(sender);
-            // "renk <color>" - Changes the color of the command sender
-        } else if (args.length == 1) {
-            return handleSelfColorChange(sender, args[0]);
-            // "renk reset <player>" - Resets the color of another player (admin only)
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
-            return handleAdminResetColor(sender, args[1]);
-            // "renk set <player> <color>" - Sets the color of another player (admin only)
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
-            return handleAdminSetColor(sender, args[1], args[2]);
-            // Invalid arguments
-        } else {
-            sender.sendMessage(miniMessage.deserialize(getMessage("usage", Map.of())));
-            return true;
+        if (command.getName().equalsIgnoreCase("renk")) {
+            if (args.length == 1 && args[0].equalsIgnoreCase("reset")) {
+                return handleSelfColorReset(sender);
+            } else if (args.length == 1) {
+                return handleSelfColorChange(sender, args[0]);
+            } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
+                return handleAdminResetColor(sender, args[1]);
+            } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
+                return handleAdminSetColor(sender, args[1], args[2]);
+            } else {
+                sender.sendMessage(miniMessage.deserialize(getMessage("usage", Map.of())));
+                return true;
+            }
         }
+        return false;
     }
 
-    // Handles the "renk reset" command for resetting the sender's own color.
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String @NotNull [] args) {
+        if (command.getName().equalsIgnoreCase("renk")) {
+            if (args.length == 1) {
+                return List.of("black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white", "reset");
+            } else if (args.length == 2 && args[0].equalsIgnoreCase("set")) {
+                return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+            } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
+                return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
+            } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
+                return List.of("black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white");
+            }
+        }
+        return List.of();
+    }
+    //endregion
+
+    //region Command Handlers
+
+    /**
+     * Handles the "renk reset" command for resetting the sender's own color.
+     *
+     * @param sender The command sender.
+     * @return True if the command was handled successfully, false otherwise.
+     */
     private boolean handleSelfColorReset(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("player_only", Map.of())));
@@ -102,9 +130,14 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
         return true;
     }
 
-    // Handles the "renk reset <player>" command for resetting another player's color (admin only).
+    /**
+     * Handles the "renk reset <player>" command for resetting another player's color (admin only).
+     *
+     * @param sender     The command sender.
+     * @param targetName The name of the player to reset the color for.
+     * @return True if the command was handled successfully, false otherwise.
+     */
     private boolean handleAdminResetColor(CommandSender sender, String targetName) {
-        // Checks if the sender has the required permission.
         if (!sender.hasPermission("renk.reset.other")) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("no_permission", Map.of())));
             return true;
@@ -119,8 +152,7 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
         resetPlayerColor(target);
         removePlayerColor(target.getUniqueId());
 
-        Map<String, String> replacements = new HashMap<>();
-        replacements.put("player", target.getName());
+        Map<String, String> replacements = Map.of("player", target.getName());
 
         sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("admin_color_reset", replacements)));
         target.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("admin_color_reset_notify", Map.of())));
@@ -128,36 +160,44 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
         return true;
     }
 
-    // Handles the "renk <color>" command for changing the sender's own color.
+    /**
+     * Handles the "renk <color>" command for changing the sender's own color.
+     *
+     * @param sender The command sender.
+     * @param input  The color input (hex code or color name).
+     * @return True if the command was handled successfully, false otherwise.
+     */
     private boolean handleSelfColorChange(CommandSender sender, String input) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("player_only", Map.of())));
             return true;
         }
 
-        // Tries to get the hex code from the color name.  If `input` is already a hex code, it's used directly.
         String hex = input.startsWith("#") ? input : getColorFromMap(input.toLowerCase());
-
-        // Validates the color input to ensure it's a valid hex code.
-        if (hex == null || !hex.matches("^#([A-Fa-f0-9]{6})$")) {
+        if (hex == null || !isValidHexColor(hex)) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("invalid_color", Map.of())));
             return true;
         }
 
         setPlayerColor(player, hex);
-        savePlayerColor(player.getUniqueId(), hex);
 
-        Map<String, String> replacements = new HashMap<>();
-        replacements.put("output_color", hex);
-        replacements.put("input_color", input);
-        replacements.put("player", player.getName());
-
+        Map<String, String> replacements = Map.of(
+                "output_color", hex,
+                "input_color", input,
+                "player", player.getName()
+        );
         sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("color_changed", replacements)));
-
         return true;
     }
 
-    // Handles the "renk set <player> <color>" command for setting another player's color (admin only).
+    /**
+     * Handles the "renk set <player> <color>" command for setting another player's color (admin only).
+     *
+     * @param sender     The command sender.
+     * @param targetName The name of the player to set the color for.
+     * @param input      The color input (hex code or color name).
+     * @return True if the command was handled successfully, false otherwise.
+     */
     private boolean handleAdminSetColor(CommandSender sender, String targetName, String input) {
         if (!sender.hasPermission("renk.set.other")) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("no_permission", Map.of())));
@@ -170,91 +210,112 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
             return true;
         }
 
-        // Tries to get the hex code from the color name. If `input` is already a hex code, it's used directly.
         String hex = input.startsWith("#") ? input : getColorFromMap(input.toLowerCase());
-
-        // Validates the color input to ensure it's a valid hex code.
-        if (hex == null || !hex.matches("^#([A-Fa-f0-9]{6})$")) {
+        if (hex == null || !isValidHexColor(hex)) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("invalid_color", Map.of())));
             return true;
         }
 
         setPlayerColor(target, hex);
-        savePlayerColor(target.getUniqueId(), hex);
 
-        Map<String, String> replacements = new HashMap<>();
-        replacements.put("player", target.getName());
-        replacements.put("output_color", hex);
-        replacements.put("input_color", input);
-
+        Map<String, String> replacements = Map.of(
+                "player", target.getName(),
+                "output_color", hex,
+                "input_color", input
+        );
         sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("admin_color_set", replacements)));
 
-        replacements.clear();
-        replacements.put("output_color", hex);
-        replacements.put("input_color", input);
-
-        target.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("admin_color_notify", replacements)));
-
+        target.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("admin_color_notify", Map.of(
+                "output_color", hex,
+                "input_color", input
+        ))));
         return true;
     }
+    //endregion
 
-    // Sets the player's display name and tab list name to the specified color.
+    //region Color Management
     private void setPlayerColor(Player player, String hex) {
-        // Validates the provided hex code.  If it's invalid, defaults to white.
-        if (hex == null || !hex.matches("^#([A-Fa-f0-9]{6})$")) {
+        if (hex == null || !isValidHexColor(hex)) {
             player.sendMessage("Your color setting is invalid or missing, setting to default.");
-            hex = "#FFFFFF"; // Default color (white)
+            hex = DEFAULT_HEX_COLOR;
         }
 
+        // Find closest Minecraft color
+        String minecraftColor = findClosestMinecraftColor(hex);
+
+        // Setup team with Minecraft color
+        setupTeam(player, minecraftColor);
+
+        // Set display name with hex color
         MiniMessage miniMessage = MiniMessage.miniMessage();
-        // Constructs the colored name using MiniMessage's `<color>` tag.
         Component coloredName = miniMessage.deserialize("<color:" + hex + ">" + player.getName() + "</color>");
-
-        // Set the display name in chat
         player.displayName(coloredName);
-
-        // Set the tab list name
         player.playerListName(coloredName);
+
+        // Save both colors
+        PlayerColorData colorData = new PlayerColorData(hex, minecraftColor);
+        savePlayerColor(player.getUniqueId(), colorData);
     }
 
     private void resetPlayerColor(Player player) {
+        // Remove from team
+        for (Team team : scoreboard.getTeams()) {
+            if (team.hasEntry(player.getName())) {
+                team.removeEntry(player.getName());
+            }
+        }
+
         MiniMessage miniMessage = MiniMessage.miniMessage();
         Component defaultName = miniMessage.deserialize(player.getName());
-
-        // Set the display name in chat
         player.displayName(defaultName);
-
-        // Set the tab list name
         player.playerListName(defaultName);
     }
 
-    // Loads player color data from the JSON file.
+    private boolean isValidHexColor(String hex) {
+        return hex.matches("^#([A-Fa-f0-9]{6})$");
+    }
+    //endregion
+
+    //region Team Management
+    private void setupTeam(Player player, String minecraftColor) {
+        String teamName = "renk_teams_" + minecraftColor;
+        Team team = scoreboard.getTeam(teamName);
+
+        // Create team if it doesn't exist
+        if (team == null) {
+            team = scoreboard.registerNewTeam(teamName);
+            team.color(NamedTextColor.NAMES.value(minecraftColor.toLowerCase()));
+        }
+
+        // Remove player from any existing teams
+        for (Team existingTeam : scoreboard.getTeams()) {
+            if (existingTeam.hasEntry(player.getName())) {
+                existingTeam.removeEntry(player.getName());
+            }
+        }
+
+        // Add player to new team
+        team.addEntry(player.getName());
+    }
+    //endregion
+
+    //region Data Persistence
     private void loadData() {
-        // Creates a File object representing the data file.
         File dataFile = new File(DATA_FILE_PATH);
-        // If the data file doesn't exist, initialize the playerColors map and return.
         if (!dataFile.exists()) {
             playerColors.clear();
             return;
         }
 
-        // Reads the data from the JSON file using a FileReader and Gson.
         try (FileReader reader = new FileReader(dataFile)) {
-            // Defines the type of data to be read from the JSON file (Map<UUID, String>).
-            Type type = new TypeToken<Map<UUID, String>>() {}.getType();
-            // Deserializes the JSON data into a Map<UUID, String> object.
-            Map<UUID, String> loadedData = gson.fromJson(reader, type);
-
-            // If data was loaded, populate the playerColors map.
+            Type type = new TypeToken<Map<UUID, PlayerColorData>>() {
+            }.getType();
+            Map<UUID, PlayerColorData> loadedData = gson.fromJson(reader, type);
+            playerColors.clear();
             if (loadedData != null) {
-                playerColors.clear(); // Clear existing data
-                playerColors.putAll(loadedData); // Add all loaded data
-            } else {
-                playerColors.clear(); // Ensure it's empty if loading fails
+                playerColors.putAll(loadedData);
             }
             getLogger().info("Loaded player color data from JSON.");
-
-            // Handles potential IOExceptions during file reading.
         } catch (IOException e) {
             getLogger().severe("Error loading player color data: " + e.getMessage());
             e.printStackTrace();
@@ -262,34 +323,25 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
         }
     }
 
-    // Saves player color data to the JSON file.
     private void saveData() {
         File dataFile = new File(DATA_FILE_PATH);
         File parentDir = dataFile.getParentFile();
-
-        // Creates the parent directory if it doesn't exist.
-        if (!parentDir.exists()) {
-            if (!parentDir.mkdirs()) {
-                getLogger().severe("Failed to create plugin data folder!");
-                return;
-            }
+        if (!parentDir.exists() && !parentDir.mkdirs()) {
+            getLogger().severe("Failed to create plugin data folder!");
+            return;
         }
 
-        // Writes the player color data to the JSON file using a FileWriter and Gson.
         try (FileWriter writer = new FileWriter(dataFile)) {
             gson.toJson(playerColors, writer);
             getLogger().info("Saved player color data to JSON.");
-            // Handles potential IOExceptions during file writing.
         } catch (IOException e) {
             getLogger().severe("Error saving player color data: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    // Saves a player's color to the data store.
-    private void savePlayerColor(UUID playerUUID, String colorHex) {
-        playerColors.put(playerUUID, colorHex);
-        // Saves the data to the JSON file asynchronously to prevent blocking the main thread.
+    private void savePlayerColor(UUID playerUUID, PlayerColorData colorData) {
+        playerColors.put(playerUUID, colorData);
         Bukkit.getScheduler().runTaskAsynchronously(this, this::saveData);
     }
 
@@ -297,8 +349,57 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
         playerColors.remove(playerUUID);
         Bukkit.getScheduler().runTaskAsynchronously(this, this::saveData);
     }
+    //endregion
 
-    // Maps color names to their corresponding hex codes.
+    //region Color Conversion
+    private String findClosestMinecraftColor(String hexColor) {
+        // Remove the # prefix if present
+        hexColor = hexColor.replace("#", "");
+
+        // Convert hex to RGB
+        int r = Integer.parseInt(hexColor.substring(0, 2), 16);
+        int g = Integer.parseInt(hexColor.substring(2, 4), 16);
+        int b = Integer.parseInt(hexColor.substring(4, 6), 16);
+
+        // Define Minecraft colors with their RGB values
+        Map<String, int[]> minecraftColors = new HashMap<>();
+        minecraftColors.put("black", new int[]{0, 0, 0});
+        minecraftColors.put("dark_blue", new int[]{0, 0, 170});
+        minecraftColors.put("dark_green", new int[]{0, 170, 0});
+        minecraftColors.put("dark_aqua", new int[]{0, 170, 170});
+        minecraftColors.put("dark_red", new int[]{170, 0, 0});
+        minecraftColors.put("dark_purple", new int[]{170, 0, 170});
+        minecraftColors.put("gold", new int[]{255, 170, 0});
+        minecraftColors.put("gray", new int[]{170, 170, 170});
+        minecraftColors.put("dark_gray", new int[]{85, 85, 85});
+        minecraftColors.put("blue", new int[]{85, 85, 255});
+        minecraftColors.put("green", new int[]{85, 255, 85});
+        minecraftColors.put("aqua", new int[]{85, 255, 255});
+        minecraftColors.put("red", new int[]{255, 85, 85});
+        minecraftColors.put("light_purple", new int[]{255, 85, 255});
+        minecraftColors.put("yellow", new int[]{255, 255, 85});
+        minecraftColors.put("white", new int[]{255, 255, 255});
+
+        String closestColor = null;
+        double minDistance = Double.MAX_VALUE;
+
+        for (Map.Entry<String, int[]> entry : minecraftColors.entrySet()) {
+            int[] color = entry.getValue();
+            double distance = Math.sqrt(
+                    Math.pow(r - color[0], 2) +
+                            Math.pow(g - color[1], 2) +
+                            Math.pow(b - color[2], 2)
+            );
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestColor = entry.getKey();
+            }
+        }
+
+        return closestColor;
+    }
+
     private String getColorFromMap(String colorName) {
         return switch (colorName) {
             case "black" -> "#000000";
@@ -320,21 +421,9 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
             default -> null;
         };
     }
+    //endregion
 
-    @Override
-    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String[] args) {
-        if (args.length == 1) {
-            return List.of("black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white", "reset");
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("set")) {
-            return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
-            return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
-            return List.of("black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white");
-        }
-        return List.of();
-    }
-
+    //region Configuration
     private String getMessage(String key, Map<String, String> replacements) {
         String message = getConfig().getString("messages." + key, key);
         // Replaces placeholders in the message with values from the `replacements` map.
@@ -342,5 +431,36 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
             message = message.replace("%" + entry.getKey() + "%", entry.getValue());
         }
         return message;
+    }
+    //endregion
+
+    //region Inner Classes
+
+    /**
+     * Listener for player join events to apply the color on join.
+     */
+    private class PlayerJoinListener implements Listener {
+        @EventHandler
+        public void onPlayerJoin(PlayerJoinEvent event) {
+            Player player = event.getPlayer();
+            PlayerColorData colorData = playerColors.get(player.getUniqueId());
+            if (colorData != null) {
+                setPlayerColor(player, colorData.hexColor);
+            }
+        }
+    }
+    //endregion
+}
+
+/**
+ * Represents player color data, storing the hex color and Minecraft color.
+ */
+class PlayerColorData {
+    String hexColor;
+    String minecraftColor;
+
+    public PlayerColorData(String hexColor, String minecraftColor) {
+        this.hexColor = hexColor;
+        this.minecraftColor = minecraftColor;
     }
 }
