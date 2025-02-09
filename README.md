@@ -1,26 +1,36 @@
-# Renk - Minecraft Color Plugin
-Renk is a Minecraft plugin that allows players to change their name color.
+# Renk - A Simple Minecraft Color Plugin
+
+Renk is a Minecraft plugin that allows players to customize their display name color.  It uses hex color codes and translates them to the closest supported Minecraft color for team-based name tag coloring.
 
 ## Features
-- Players can change or reset their color using a command.
-- Admins can set the color of other players.
-- Player colors are saved to an JSON file and applied when they join.
-- Predefined color options are available (e.g., black, blue, green, etc.).
-- The plugin utilizes the [MiniMessage](https://docs.advntr.dev/) library to format color codes and messages.
 
-## Planned Features
-- Color approximated team generation to modify name tag colors.
+- Players can change or reset their color using commands.
+- Admins can set the color of other players.
+- Player colors are saved to a JSON file (`plugins/Renk/player_colors.json`) and applied when they join.
+- Supports hex color codes (e.g., `#FF0000`) and predefined color names (e.g., `red`, `blue`, `green`).
+- Utilizes the [MiniMessage](https://docs.advntr.dev/) library for formatting color codes and messages.
+- Uses Scoreboard Teams to approximate the player's display name color on their nametag.
+- Configuration file (`config.yml`) for customizing messages.
 
 ## Commands
-- `/renk <#hex>`: Changes the player's color to the specified hex color or predefined color.
-- `/renk set <player> <#hex>`: Allows admins to set the color of another player.
-- `/renk reset>`: Allows users to reset their own color.
-- `/renk reset <player>`: Allows admins to reset the colour of another player.
+
+- `/renk <#hex | color_name>`: Changes the player's own color to the specified hex color or predefined color name.  Examples: `/renk #FF0000`, `/renk red`.
+- `/renk set <player> <#hex | color_name>`: Allows admins to set the color of another player. Examples: `/renk set Kikaru #00FF00`, `/renk set Kikaru green`.
+- `/renk reset`: Resets the player's own color to the default.
+- `/renk reset <player>`: Allows admins to reset another player's color.
+
+### Predefined Colors
+The following color names can be used instead of hex codes: `black`, `dark_blue`, `dark_green`, `dark_aqua`, `dark_red`, `dark_purple`, `gold`, `gray`, `dark_gray`, `blue`, `green`, `aqua`, `red`, `light_purple`, `yellow`, `white`.
 
 ### Permissions
-- `renk.use`: Allows the use of the plugin itself.
-- `renk.set.other`: Allows the change of color for other players.
-- `renk.reset.other`: Allows reseting another player's color.
+
+- `renk.use`: Allows the use of the `/renk` command.
+- `renk.set.other`: Allows the use of the `/renk set` command to change the color of other players.
+- `renk.reset.other`: Allows the use of the `/renk reset` command to reset the color of other players.
+
+## Configuration
+The plugin uses a `config.yml` file located in the `plugins/Renk/` directory to store configurable messages.  You can customize the messages that are displayed to players by modifying this file.  Use color codes with MiniMessage.
+
 
 ## How to Contribute
 1. Fork the repository.
