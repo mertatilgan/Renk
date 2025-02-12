@@ -8,6 +8,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.command.*;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -39,6 +40,7 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final Map<UUID, PlayerColorData> playerColors = new HashMap<>();
     private Scoreboard scoreboard;
+    private Map<String, String> predefinedColors;
     //endregion
 
     //region Plugin Lifecycle
@@ -46,6 +48,9 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
     public void onEnable() {
         saveDefaultConfig();
         reloadConfig();
+
+        // Load colors from config
+        loadColorsFromConfig();
 
         // Register command and tab completer
         PluginCommand renkCommand = getCommand("renk");
@@ -66,6 +71,18 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
     @Override
     public void onDisable() {
         saveData();
+    }
+    //endregion
+
+    //region Color Loading
+    private void loadColorsFromConfig() {
+        predefinedColors = new HashMap<>();
+        ConfigurationSection colorsSection = getConfig().getConfigurationSection("colors");
+        if (colorsSection != null) {
+            for (String key : colorsSection.getKeys(false)) {
+                predefinedColors.put(key.toLowerCase(), colorsSection.getString(key));
+            }
+        }
     }
     //endregion
 
@@ -96,16 +113,22 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String @NotNull [] args) {
         if (command.getName().equalsIgnoreCase("renk")) {
             if (args.length == 1) {
-                return List.of("black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white", "reset");
+                return new ArrayList<>(predefinedColors.keySet());
             } else if (args.length == 2 && args[0].equalsIgnoreCase("set")) {
                 return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
             } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
                 return Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
             } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
-                return List.of("black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white");
+                return new ArrayList<>(predefinedColors.keySet());
             }
         }
         return List.of();
+    }
+    //endregion
+
+    //region Color Management
+    private String getColorFromMap(String colorName) {
+        return predefinedColors.getOrDefault(colorName.toLowerCase(), null);
     }
     //endregion
 
@@ -173,7 +196,7 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
             return true;
         }
 
-        String hex = input.startsWith("#") ? input : getColorFromMap(input.toLowerCase());
+        String hex = input.startsWith("#") ? input : getPredefinedColor(input.toLowerCase());
         if (hex == null || !isValidHexColor(hex)) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("invalid_color", Map.of())));
             return true;
@@ -210,7 +233,7 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
             return true;
         }
 
-        String hex = input.startsWith("#") ? input : getColorFromMap(input.toLowerCase());
+        String hex = input.startsWith("#") ? input : getPredefinedColor(input.toLowerCase());
         if (hex == null || !isValidHexColor(hex)) {
             sender.sendMessage(MiniMessage.miniMessage().deserialize(getMessage("invalid_color", Map.of())));
             return true;
@@ -400,26 +423,8 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
         return closestColor;
     }
 
-    private String getColorFromMap(String colorName) {
-        return switch (colorName) {
-            case "black" -> "#000000";
-            case "dark_blue" -> "#0000AA";
-            case "dark_green" -> "#00AA00";
-            case "dark_aqua" -> "#00AAAA";
-            case "dark_red" -> "#AA0000";
-            case "dark_purple" -> "#AA00AA";
-            case "gold" -> "#FFAA00";
-            case "gray" -> "#AAAAAA";
-            case "dark_gray" -> "#555555";
-            case "blue" -> "#5555FF";
-            case "green" -> "#55FF55";
-            case "aqua" -> "#55FFFF";
-            case "red" -> "#FF5555";
-            case "light_purple" -> "#FF55FF";
-            case "yellow" -> "#FFFF55";
-            case "white" -> "#FFFFFF";
-            default -> null;
-        };
+    private String getPredefinedColor(String colorName) {
+        return predefinedColors.get(colorName);
     }
     //endregion
 
@@ -431,6 +436,36 @@ public final class Renk extends JavaPlugin implements TabExecutor, TabCompleter 
             message = message.replace("%" + entry.getKey() + "%", entry.getValue());
         }
         return message;
+    }
+
+    private void loadPredefinedColors() {
+        predefinedColors = new HashMap<>();
+        if (getConfig().getConfigurationSection("colors") != null) {
+            for (String key : getConfig().getConfigurationSection("colors").getKeys(false)) {
+                String colorCode = getConfig().getString("colors." + key);
+                if (colorCode != null) {
+                    predefinedColors.put(key.toLowerCase(), colorCode);
+                }
+            }
+        } else {
+            // Set default colors if not configured. Maybe this option too should be configurable with a bool in config.yml?
+            predefinedColors.put("black", "#000000");
+            predefinedColors.put("dark_blue", "#0000AA");
+            predefinedColors.put("dark_green", "#00AA00");
+            predefinedColors.put("dark_aqua", "#00AAAA");
+            predefinedColors.put("dark_red", "#AA0000");
+            predefinedColors.put("dark_purple", "#AA00AA");
+            predefinedColors.put("gold", "#FFAA00");
+            predefinedColors.put("gray", "#AAAAAA");
+            predefinedColors.put("dark_gray", "#555555");
+            predefinedColors.put("blue", "#5555FF");
+            predefinedColors.put("green", "#55FF55");
+            predefinedColors.put("aqua", "#55FFFF");
+            predefinedColors.put("red", "#FF5555");
+            predefinedColors.put("light_purple", "#FF55FF");
+            predefinedColors.put("yellow", "#FFFF55");
+            predefinedColors.put("white", "#FFFFFF");
+        }
     }
     //endregion
 
